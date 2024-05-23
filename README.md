@@ -1,6 +1,6 @@
 # Trabajo-fin-de-grado
 
-#TFG.pdf <- documento del trabajo de fin de grado
+# TFG.pdf <- documento del trabajo de fin de grado
 
 # df_na.csv <- conjunto de datos utilizado para el análisis
 
