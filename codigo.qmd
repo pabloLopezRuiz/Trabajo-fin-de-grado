@@ -1,0 +1,509 @@
+---
+title: "codigo"
+author: "Pablo Manuel López Ruiz"
+format: html
+---
+
+# Código ejecutado
+
+
+## Establecimiento de la filogenia
+A partir del conjunto de datos cargado y con los datos de las especies ancestrales, creamos columnas para representar con valores binarios si una muestra pertenece a un cruzamiento o no. 
+
+```{r, results='hide'}
+# Cargamos los paquetes necesarios
+library( dplyr )
+
+# Leo la tabla de datos
+df_na <- read.csv( "df_na.csv" )
+
+# Creo las variables secundarias de interaccion entre especies
+filo <- c( "med", "ret", "max", "mic" )
+df_na[ filo ] <- lapply( df_na[ filo ], function( x ) replace( x, is.na(x), 0 ) )
+df_na[ filo ] <- lapply( df_na[ filo ], function( x ) ifelse( x == '1', 1, 0 ) )
+df_na$medXret <-ifelse( df_na$med & df_na$ret & !(df_na$max | df_na$mic ), 1, 0 )
+df_na$medXmax <-ifelse( df_na$med & df_na$max & !(df_na$ret | df_na$mic), 1, 0 )
+df_na$medXmic <-ifelse( df_na$med & df_na$mic & !(df_na$ret | df_na$max ), 1, 0 )
+df_na$retXmax <-ifelse( df_na$ret & df_na$max & !(df_na$med | df_na$mic ), 1, 0 )
+df_na$retXmic <-ifelse( df_na$ret & df_na$mic & !(df_na$med | df_na$max ), 1, 0 )
+df_na$maxXmic <-ifelse( df_na$max & df_na$mic & !(df_na$med | df_na$ret ), 1, 0 )
+df_na$medXretXmax <-ifelse(df_na$med & df_na$ret & df_na$max & !( df_na$mic ), 1, 0 )
+filo <- c( filo, "medXret", "medXmax", "medXmic", "retXmax", "retXmic", "maxXmic", "medXretXmax" )
+df_na[ filo ] <- lapply( df_na[ filo ], function( x ) ifelse( x, 1, 0 ) )
+
+```
+
+
+
+## Cálculo de las variables secundarias
+
+En base a las variables medidas sobre la superficie foliar, se construyen índices para aumentar la representatividad de los datos. 
+
+```{r}
+# Variables secundarias
+df_na$al <- ( df_na$wl * df_na$ll ) / 2
+
+df_na$alDlp <- df_na$al / df_na$lp
+
+df_na$wlDll <- df_na$wl / df_na$ll
+
+df_na$wpDwl <- df_na$wp / df_na$wl
+
+df_na$wpDlp <- df_na$wp / df_na$lp
+
+df_na$lpDll <- df_na$lp / df_na$ll
+
+df_na$spDwp <- df_na$sp / df_na$wp
+
+df_na$llMhlDll <- ( df_na$ll - df_na$hl ) / df_na$ll
+
+df_na$wlDhl <- df_na$wl / df_na$hl
+
+df_na$alDlp <- df_na$al / df_na$lp
+```
+
+
+## Regresión logística
+
+Se seleccionan las variables que se utilizarán para realizar la regresión logística, escogiendo en primer lugar como variable dependiente la pertenencia al grupo de las naranjas y mandarinas.
+
+```{r}
+# Cargamos los paquetes necesarios
+
+
+# Selección de variables para la regresión logística con el conjunto de 
+# entrenamiento de las naranjas y mandarinas
+df_sub_1 <- df_na %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
+                                 'hl', 'al', 'wlDll', 'wpDwl', 
+                                 'wpDlp', 'lpDll', 'spDwp', 
+                                 'wlDhl', 'alDlp', 'llMhlDll',
+                                 'retXmax' ) )
+
+# Ejecuto el modelo con el caracter de pertenencia al gurpo de las naranjas y 
+# mandarinas como variable categórica
+reg1_n <- glm( retXmax~., family = binomial, data = df_sub_1 )
+
+
+# Asigno las certidumbres a la tabla de datos
+df_na$p_rl_narman <- reg1_n$fitted.values
+
+# porcentaje de observaciones que han superado el umbral
+round( nrow( df_na[ ( df_na$p_rl_narman >= 0.70 ), ] ) / nrow( df_na ) * 100 )
+
+# Estadisticos de acierto y representatividad en tanto de uno
+# porcentaje de acierto
+rl_narman_med <- nrow( df_na[ ( df_na$retXmax == 1 & df_na$p_rl_narman >= 0.70 ), ] ) /
+  nrow( df_na[ ( df_na$p_rl_narman >= 0.70 ), ] )
+
+# porcentaje de representatividad
+rl_narman_rep <- nrow( df_na[ ( df_na$retXmax == 1 & df_na$p_rl_narman >= 0.70 ), ] ) / 
+  nrow( df_na[ ( df_na$retXmax == 1 ), ] )
+```
+
+Lo mismo para el grupo de los limones.
+
+```{r}
+#| echo=FALSE
+# Selección de variables para la regresión logística con el conjunto de 
+# entrenamiento de los limones
+df_sub_2 <- df_na %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
+                                 'hl', 'al', 'wlDll', 'wpDwl', 
+                                 'wpDlp', 'lpDll', 'spDwp', 
+                                 'wlDhl', 'alDlp', 'llMhlDll', 
+                                 'medXretXmax' ) )
+
+# Ejecuto el modelo con el caracter de pertenencia al gurpo de las naranjas y 
+# mandarinas como variable categórica
+reg1_l <- glm( medXretXmax~., family = binomial, data = df_sub_2 )
+
+# Asigno las certidumbres a la tabla de datos
+df_na$p_rl_lim <- reg1_l$fitted.values
+
+# porcentaje de observaciones que han superado el umbral
+round( nrow( df_na[ ( df_na$p_rl_lim >= 0.70 ), ] ) / nrow( df_na )  * 100)
+
+# Estadisticos de acierto y representatividad en tanto de uno
+# porcentaje de acierto
+rl_lim_med <- nrow( df_na[ ( df_na$medXretXmax == 1 & df_na$p_rl_lim >= 0.70 ), ] ) /
+  nrow( df_na[ ( df_na$p_rl_lim >= 0.70 ), ] )
+
+# porcentaje de representatividad
+rl_lim_rep <- nrow( df_na[ ( df_na$medXretXmax == 1 & df_na$p_rl_lim >= 0.70 ), ] ) / 
+  nrow( df_na[ ( df_na$medXretXmax == 1 ), ] )
+```
+
+## Random Forest
+
+De nuevo se sigue el mismo procedimiento, en este caso con el algoritmo de Random Forest.
+
+```{r}
+#| echo=FALSE
+# Cargamos los paquetes necesarios
+library( randomForest )
+
+# Ejecuto el modelo con el caracter de pertenencia al gurpo de las naranjas y
+# mandarinas como variable categórica. No cambio el conjunto de datos ya que
+# se usa el mismo que en la regresión logística
+reg2_n <- randomForest( retXmax~., data = df_sub_1,  ntree = 500 )
+
+# Asigno las certidumbres a la tabla de datos
+df_na$p_rf_narman <- reg2_n$predicted
+
+# porcentaje de observaciones que han superado el umbral
+round( nrow( df_na[ ( df_na$p_rf_narman >= 0.70 ), ] ) / nrow( df_na ) * 100)
+
+# Estadisticos de acierto y representatividad en tanto de uno
+# porcentaje de acierto
+rf_narman_med <- nrow( df_na[ ( df_na$retXmax == 1 & df_na$p_rf_narman >= 0.70 ), ] ) /
+  nrow( df_na[ ( df_na$p_rf_narman >= 0.70 ), ] )
+
+# porcentaje de representatividad
+rf_narman_rep <- nrow( df_na[ ( df_na$retXmax == 1 & df_na$p_rf_narman >= 0.7 ), ] ) / 
+  nrow( df_na[ ( df_na$retXmax == 1 ), ] )
+```
+
+Lo mismo para el grupo de los limones.
+
+```{r}
+#| echo=FALSE
+# Ejecuto el modelo con el caracter de pertenencia al gurpo de los limones
+# como variable categórica. No cambio el conjunto de datos ya que
+# se usa el mismo que en la regresión logística
+reg2_l <- randomForest( medXretXmax~., data = df_sub_2,  ntree = 500 )
+
+# Asigno las certidumbres a la tabla de datos
+df_na$p_rf_lim <- reg2_l$predicted
+
+# Estadisticos de acierto y representatividad en tanto de uno
+# porcentaje de obsevaciones que han superado el umbral
+round( nrow( df_na[ ( df_na$p_rf_lim >= 0.70 ), ] ) / nrow( df_na ) )
+
+# Porcentaje de acierto
+rf_lim_med <- nrow( df_na[ ( df_na$medXretXmax == 1 & df_na$p_rf_lim >= 0.70 ), ] ) / 
+              nrow( df_na[ ( df_na$p_rf_lim >= 0.70 ), ] )
+
+# Porcentaje de representatividad
+rf_lim_rep <- nrow( df_na[ ( df_na$medXretXmax == 1 & df_na$p_rf_lim >= 0.70 ), ] ) / 
+              nrow( df_na[ ( df_na$medXretXmax == 1 ), ] )
+```
+
+## XGBoost
+
+Debido a que el algoritmo de XGBoost funciona distinto, la ejecución es distinta pese a que el procedimiento es igual.
+
+```{r}
+#| echo=FALSE
+# Cargamos los paquetes necesarios
+library( xgboost )
+
+# Creamos una columna que contenga el grupo al que pertenece cada muestra, en 
+# este caso, limones, naranjas o mandarinas y otros (si no pertenece a ninguno)
+df_na$grupo <- ifelse( df_na$medXretXmax == 1, "limon", ifelse( df_na$retXmax == 1, "narman", "otro" ) )
+
+# Selección de variables para XGBoost con la variable del grupo
+df_sub <- df_na %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
+                               'hl', 'al', 'wlDll', 'wpDwl', 
+                               'wpDlp', 'lpDll', 'spDwp', 
+                               'wlDhl', 'alDlp', 'llMhlDll', 
+                               'grupo' ) )
+
+# Establezco "grupo" como variable categórica
+labelVar <- "grupo"
+
+# Cambio el grupo por una variable numerica en vista de que XGBoost no acepta
+# variables categóricas no numéricas
+df_sub[ , labelVar ] <- as.numeric( as.factor( df_sub[ , labelVar ] ) ) - 1
+
+# creo un indice para saber le numero de filas reales y luego poder reordenarlo
+df_sub$index <- 1:nrow( df_sub )
+
+# Ordeno segun el grupo
+df_sub <- df_sub[ order( df_sub$grupo ), ]
+
+# Determinamos todas las columnas de variables que vamos a analizar y el número
+# de filas que tenemos
+columnasActivas <- c( 1:(ncol(df_sub) - 2) )
+N <- nrow( df_sub )
+
+# Tamaños de cada uno de los subgrupos para poder hacer los conjuntos de
+# entrenamiento.
+n0 <- nrow( df_sub[ df_sub$grupo == 0, ] ) # Limones
+n1 <- nrow( df_sub[ df_sub$grupo == 1, ] ) # Naranjas
+n2 <- nrow( df_sub[ df_sub$grupo == 2, ] ) # Otros
+
+# Nos quedamos con el mínimo de los tamaños para realizar el entrenamiento
+lim <- min( n0, n1 )
+
+# Establecemos el porcentaje de datos de entrenamiento
+tamEntrenamiento <- 0.5 
+
+# Calculamos los datos de entrenamiento
+train <- c( sample( 1:162 , lim * tamEntrenamiento ), 
+            sample( 163:414 , lim * tamEntrenamiento ) )
+
+# Entrenamos el modelo
+bst <- xgboost(
+  data  = as.matrix( df_sub[ train , columnasActivas ] ),
+  label = df_sub[ train, labelVar ],
+  nrounds = 100,
+  objective = "multi:softprob",
+  feval = NULL,
+  verbose = 0,
+  num_class = 3 )
+
+# Hacemos la predicción
+pred <- predict( bst, as.matrix( df_sub[ , columnasActivas ] ) )
+pred_matrix <- matrix(pred, nrow = nrow(df_sub), ncol = 3, byrow = TRUE)
+
+# Seleccionar las probabilidades para los limones y las narman por separado
+df_sub$p_xg_lim <- pred_matrix[, 1]
+df_sub$p_xg_narman <- pred_matrix[, 2]
+
+# Reordenamos según el índice antes establecido
+df_sub <- df_sub[ order( df_sub$index ), ]
+
+# Asignamos la prediccion al conjunto de datos original
+df_na$p_xg_lim <- df_sub$p_xg_lim
+df_na$p_xg_narman <- df_sub$p_xg_narman
+
+# Estadisticos de acierto y representatividad en tanto de uno
+# porcentaje de obsevaciones que han superado el umbral
+# Para las naranjas y mandarinas
+round( nrow( df_na[ ( df_na$p_xg_narman >= 0.70 ), ] ) / nrow( df_na ) )
+# Para los limones
+round( nrow( df_na[ ( df_na$p_xg_lim >= 0.70 ), ] ) / nrow( df_na ) )
+
+# Porcentaje de acierto
+# Para las naranjas y mandarinas
+xg_narman_med <- nrow( df_na[ ( df_na$retXmax == 1 & df_na$p_xg_narman >= 0.70 ), ] ) / 
+                 nrow( df_na[ df_na$p_xg_narman >= 0.70, ] )
+
+# Para los limones
+xg_lim_med <- nrow( df_na[ ( df_na$medXretXmax == 1 & df_na$p_xg_lim >= 0.70 ), ] ) / 
+              nrow( df_na[ df_na$p_xg_lim >= 0.70, ] )
+
+# Porcentaje de representatividad
+# Para las naranjas y mandarinas
+xg_narman_rep <- nrow( df_na[ ( df_na$retXmax == 1 ) & ( df_na$p_xg_narman >= 0.70 ), ] ) / 
+                 nrow( df_na[ df_na$retXmax == 1, ] )
+
+# Para los limones
+xg_lim_rep <- nrow( df_na[ ( df_na$medXretXmax == 1 ) & ( df_na$p_xg_lim >= 0.70 ), ] ) / 
+              nrow( df_na[ df_na$medXretXmax == 1, ] )
+```
+
+## Unión de los modelos
+
+Unimos las inferencias hechas con los tres modelos intentando mejorar la capacidad predictiva.
+
+```{r}
+#| echo=FALSE
+# Cargamos los paquetes necesarios
+library(opera)
+library(dplyr)
+library(Metrics)
+
+# Guardamos las predicciones de los 3 modelos 
+prllim <- df_na$p_rl_lim
+prflim <- df_na$p_rf_lim
+pxglim <- df_na$p_xg_lim
+
+prlnarman <- df_na$p_rl_narman
+prfnarman <- df_na$p_rf_narman
+pxgnarman <- df_na$p_xg_narman
+
+# Combinamos las predicciones de los modelos en una matriz
+experts_lim <- cbind(prllim, prflim, pxglim)
+experts_narman <- cbind(prlnarman, prfnarman, pxgnarman)
+
+# Renombramos las columnas de la matriz
+nom_exp <- c('LM Model', 'Random Forest', 'XGBoost')
+colnames(experts_lim) <- nom_exp
+colnames(experts_narman) <- nom_exp
+
+# Agregación de expertos
+agg_lim <- mixture(Y = df_na$medXretXmax, experts = experts_lim, loss.gradient = TRUE)
+agg_narman <- mixture(Y = df_na$retXmax, experts = experts_narman, loss.gradient = TRUE)
+
+# Añadimos las predicciones al conjunto de datos
+df_na$pred_lim <- agg_lim$prediction
+df_na$pred_narman <- agg_narman$prediction
+
+```
+
+## Modelo sobre ancestrales
+
+En este modelo, se parte de la pertenencia o ausencia de los grupos creados por los cuatro ancestros estudiados, el procedimiento es similar.
+
+```{r}
+#| echo=FALSE
+# Cargamos los datos
+df_anc <- read.csv('datos/df_na.csv')
+
+# Establecimiento de los grupos
+df_sub_med <- df_anc %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
+                                 'hl', 'al', 'wlDll', 'wpDwl', 
+                                 'wpDlp', 'lpDll', 'spDwp', 
+                                 'wlDhl', 'alDlp', 'llMhlDll',
+                                 'med' ) )
+
+df_sub_max <- df_anc %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
+                                 'hl', 'al', 'wlDll', 'wpDwl', 
+                                 'wpDlp', 'lpDll', 'spDwp', 
+                                 'wlDhl', 'alDlp', 'llMhlDll',
+                                 'max' ) )
+
+df_sub_mic <- df_anc %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
+                                 'hl', 'al', 'wlDll', 'wpDwl', 
+                                 'wpDlp', 'lpDll', 'spDwp', 
+                                 'wlDhl', 'alDlp', 'llMhlDll',
+                                 'mic' ) )
+
+df_sub_ret <- df_anc %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
+                                 'hl', 'al', 'wlDll', 'wpDwl', 
+                                 'wpDlp', 'lpDll', 'spDwp', 
+                                 'wlDhl', 'alDlp', 'llMhlDll',
+                                 'ret' ) )
+
+# Modelos
+rl_med <- glm( med ~ ., data = df_sub_med, family = binomial )
+rf_med <- randomForest( med ~ ., data = df_sub_med, ntree = 1000, importance = TRUE )
+
+rf_max <- randomForest( max ~ ., data = df_sub_max, ntree = 1000, importance = TRUE )
+rl_max <- glm( max ~ ., data = df_sub_max, family = binomial )
+
+rf_mic <- randomForest( mic ~ ., data = df_sub_mic, ntree = 1000, importance = TRUE )
+rl_mic <- glm( mic ~ ., data = df_sub_mic, family = binomial )
+
+rf_ret <- randomForest( ret ~ ., data = df_sub_ret, ntree = 1000, importance = TRUE )
+rl_ret <- glm( ret ~ ., data = df_sub_ret, family = binomial )
+
+# Predicciones
+df_anc$p_rl_med <- rl_med$fitted.values
+df_anc$p_rf_med <- rf_med$predicted
+
+df_anc$p_rl_max <- rl_max$fitted.values
+df_anc$p_rf_max <- rf_max$predicted
+
+df_anc$p_rl_mic <- rl_mic$fitted.values
+df_anc$p_rf_mic <- rf_mic$predicted
+
+df_anc$p_rl_ret <- rl_ret$fitted.values
+df_anc$p_rf_ret <- rf_ret$predicted
+
+# Calculamos la agregación de expertos
+prlmed <- df_anc$p_rl_med
+prfmed <- df_anc$p_rf_med
+
+prlmax <- df_anc$p_rl_max
+prfmax <- df_anc$p_rf_max
+
+prlmic <- df_anc$p_rl_mic
+prfmic <- df_anc$p_rf_mic
+
+prlret <- df_anc$p_rl_ret
+prfret <- df_anc$p_rf_ret
+
+# Combinmos las predicciones de los modelos en una matriz
+experts_med <- cbind(prlmed, prfmed)
+experts_max <- cbind(prlmax, prfmax)
+experts_mic <- cbind(prlmic, prfmic)
+experts_ret <- cbind(prlret, prfret)
+
+# Renombramos las columnas de la matriz
+
+nom_exp <- c('LM Model', 'Random Forest')
+
+colnames(experts_med) <- nom_exp
+colnames(experts_max) <- nom_exp
+colnames(experts_mic) <- nom_exp
+colnames(experts_ret) <- nom_exp
+
+# Agregación de expertos
+agg_med <- mixture(Y = df_anc$med, experts = experts_med, loss.gradient = TRUE)
+agg_max <- mixture(Y = df_anc$max, experts = experts_max, loss.gradient = TRUE)
+agg_mic <- mixture(Y = df_anc$mic, experts = experts_mic, loss.gradient = TRUE)
+agg_ret <- mixture(Y = df_anc$ret, experts = experts_ret, loss.gradient = TRUE)
+
+# Añadimos las predicciones agregadas al conjunto de datos
+df_anc$pred_med <- agg_med$prediction
+df_anc$pred_max <- agg_max$prediction
+df_anc$pred_mic <- agg_mic$prediction
+df_anc$pred_ret <- agg_ret$prediction
+
+# Estadisticos
+# C. medica
+# Porcentaje de aciertos
+media_med <- nrow( df_anc[ ( df_anc$med == 1 & df_anc$pred_med > 0.7 ), ] ) / 
+              nrow( df_anc[ df_anc$pred_med > 0.7, ] )
+
+# Porcentaje de representatividad
+rep_med <- nrow( df_anc[ ( df_anc$med == 1 & df_anc$pred_med > 0.7 ), ] ) / 
+              nrow( df_anc[ df_anc$med == 1, ] )
+
+# C. maxima
+# Porcentaje de aciertos
+media_max <- nrow( df_anc[ ( df_anc$max == 1 & df_anc$pred_max > 0.7 ), ] ) /
+              nrow( df_anc[ df_anc$pred_max > 0.7 , ] )
+
+# Porcentaje de representatividad
+rep_max <- nrow( df_anc[ ( df_anc$max == 1 & df_anc$pred_max > 0.7 ), ] ) /
+              nrow( df_anc[ df_anc$max == 1, ] )
+
+# C. micrantha
+# Porcentaje de aciertos
+media_mic <- nrow( df_anc[ ( df_anc$mic == 1 & df_anc$pred_mic > 0.7 ), ] ) /
+              nrow( df_anc[ df_anc$pred_mic > 0.7, ] )
+
+# Porcentaje de representatividad
+rep_mic <- nrow( df_anc[ ( df_anc$mic == 1 & df_anc$pred_mic > 0.7),] ) /
+              nrow( df_anc[ df_anc$mic == 1, ] )
+
+# C. reticulata
+# Porcentaje de aciertos
+media_ret <- nrow( df_anc[ ( df_anc$ret == 1 & df_anc$pred_ret > 0.7 ), ] ) /
+              nrow( df_anc[ df_anc$pred_ret > 0.7, ] )
+
+# Porcentaje de representatividad
+rep_ret <- nrow( df_anc[ ( df_anc$ret == 1 & df_anc$pred_ret > 0.7 ), ] ) /
+              nrow( df_anc[ df_anc$ret == 1, ] )
+
+# probabilidades de pertenencia a los grupos de naranjas y mandarinas o limones
+# en función de las probabilidades individuales
+# C. reticulata x C. maxima
+df_anc$pred_retXmax <- df_anc$pred_ret * df_anc$pred_max * 
+                       ( 1 - df_anc$pred_med ) * ( 1 - df_anc$pred_mic )
+
+# Porcentaje de aciertos
+media_retXmax <- nrow( df_anc[ ( df_anc$ret == 1 & df_anc$max == 1 & 
+                                   df_anc$med != 1 & df_anc$mic != 1 & 
+                                   df_anc$pred_retXmax > 0.7 ), ] ) /
+                                    nrow( df_anc[ df_anc$pred_retXmax > 0.7 , ] ) 
+
+# Porcentaje de representatividad
+rep_retXmax <- nrow( df_anc[ ( df_anc$ret == 1 & df_anc$max == 1 & 
+                                   df_anc$med != 1 & df_anc$mic != 1 & 
+                                   df_anc$pred_retXmax > 0.7 ), ] ) /
+                                    nrow( df_anc[ ( df_anc$ret == 1 & df_anc$max == 1 & 
+                                    df_anc$med != 1 & df_anc$mic != 1 ), ] )
+
+#C. medica x C. reticulata x C. maxima
+df_anc$pred_medXretXmax <- df_anc$pred_med * df_anc$pred_ret * 
+                           df_anc$pred_max * ( 1 - df_anc$pred_mic )
+
+# Porcentaje de aciertos
+media_medXretXmax <- nrow( df_anc[ ( df_anc$med == 1 & df_anc$ret == 1 & 
+                                       df_anc$max == 1 & df_anc$mic != 1 & 
+                                       df_anc$pred_medXretXmax > 0.7 ), ] ) /
+                                        nrow( df_anc[ df_anc$pred_medXretXmax > 0.7 , ] )
+
+# Porcentaje de representatividad
+rep_medXretXmax <- nrow( df_anc[ ( df_anc$med == 1 & df_anc$ret == 1 & 
+                                    df_anc$max == 1 & df_anc$mic != 1 & 
+                                    df_anc$pred_medXretXmax > 0.7 ), ] ) /
+                                     nrow( df_anc[ ( df_anc$med == 1 & 
+                                     df_anc$ret == 1 & df_anc$max == 1 & 
+                                     df_anc$mic != 1 ), ] )
+
+
+```
