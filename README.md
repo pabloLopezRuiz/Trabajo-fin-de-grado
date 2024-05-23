@@ -1,11 +1,21 @@
 # Trabajo-fin-de-grado
 
-# TFG.pdf <- documento del trabajo de fin de grado
+### TFG.pdf 
 
-# df_na.csv <- conjunto de datos utilizado para el análisis
+Documento del trabajo de fin de grado
 
-# codigo.pdf <- pdf del código utilizado para llevar a cabo el análisis
+### df_na.csv 
 
-# codigo.qmd <- documento de quarto del código utilizado para llevar a cabo el anáisis
+Conjunto de datos utilizado para el análisis
 
-#/fig <-  carpeta con las figuras utilizadas en el trabajo
+### codigo.pdf 
+
+Pdf del código utilizado para llevar a cabo el análisis
+
+### codigo.qmd 
+
+Documento de quarto del código utilizado para llevar a cabo el anáisis
+
+### /fig 
+
+Carpeta con las figuras utilizadas en el trabajo
