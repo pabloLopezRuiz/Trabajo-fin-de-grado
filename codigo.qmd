@@ -500,5 +500,3 @@ rep_medXretXmax <- nrow( df_anc[ ( df_anc$med == 1 & df_anc$ret == 1 &
 
 
 ```
-
-```
