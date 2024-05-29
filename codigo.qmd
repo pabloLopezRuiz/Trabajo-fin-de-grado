@@ -1,21 +1,29 @@
 ---
-title: "codigo"
-author: "Pablo Manuel López Ruiz"
+title: "Código"
 format: html
+
+knitr:
+  opts_chunk:
+    warning: FALSE
 ---
-
-# Código ejecutado
-
 
 ## Establecimiento de la filogenia
 A partir del conjunto de datos cargado y con los datos de las especies ancestrales, creamos columnas para representar con valores binarios si una muestra pertenece a un cruzamiento o no. 
 
+
+
 ```{r, results='hide'}
 # Cargamos los paquetes necesarios
 library( dplyr )
+library( randomForest )
+library( xgboost )
+library( opera )
+library( Metrics )
 
 # Leo la tabla de datos
-df_na <- read.csv( "df_na.csv" )
+df_na <- read.csv( 'df_na.csv',
+                sep = ',', dec = '.',
+                header = TRUE, fileEncoding = 'UTF-8' )
 
 # Creo las variables secundarias de interaccion entre especies
 filo <- c( "med", "ret", "max", "mic" )
@@ -68,9 +76,6 @@ df_na$alDlp <- df_na$al / df_na$lp
 Se seleccionan las variables que se utilizarán para realizar la regresión logística, escogiendo en primer lugar como variable dependiente la pertenencia al grupo de las naranjas y mandarinas.
 
 ```{r}
-# Cargamos los paquetes necesarios
-
-
 # Selección de variables para la regresión logística con el conjunto de 
 # entrenamiento de las naranjas y mandarinas
 df_sub_1 <- df_na %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
@@ -83,12 +88,12 @@ df_sub_1 <- df_na %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl',
 # mandarinas como variable categórica
 reg1_n <- glm( retXmax~., family = binomial, data = df_sub_1 )
 
-
 # Asigno las certidumbres a la tabla de datos
 df_na$p_rl_narman <- reg1_n$fitted.values
 
 # porcentaje de observaciones que han superado el umbral
-round( nrow( df_na[ ( df_na$p_rl_narman >= 0.70 ), ] ) / nrow( df_na ) * 100 )
+rl_narman_round <- round( nrow( df_na[ ( df_na$p_rl_narman >= 0.70 ), ] ) / 
+                   nrow( df_na ) * 100 )
 
 # Estadisticos de acierto y representatividad en tanto de uno
 # porcentaje de acierto
@@ -103,7 +108,6 @@ rl_narman_rep <- nrow( df_na[ ( df_na$retXmax == 1 & df_na$p_rl_narman >= 0.70 )
 Lo mismo para el grupo de los limones.
 
 ```{r}
-#| echo=FALSE
 # Selección de variables para la regresión logística con el conjunto de 
 # entrenamiento de los limones
 df_sub_2 <- df_na %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
@@ -120,7 +124,8 @@ reg1_l <- glm( medXretXmax~., family = binomial, data = df_sub_2 )
 df_na$p_rl_lim <- reg1_l$fitted.values
 
 # porcentaje de observaciones que han superado el umbral
-round( nrow( df_na[ ( df_na$p_rl_lim >= 0.70 ), ] ) / nrow( df_na )  * 100)
+rl_lim_round <- round( nrow( df_na[ ( df_na$p_rl_lim >= 0.70 ), ] ) / 
+                nrow( df_na )  * 100)
 
 # Estadisticos de acierto y representatividad en tanto de uno
 # porcentaje de acierto
@@ -137,10 +142,6 @@ rl_lim_rep <- nrow( df_na[ ( df_na$medXretXmax == 1 & df_na$p_rl_lim >= 0.70 ), 
 De nuevo se sigue el mismo procedimiento, en este caso con el algoritmo de Random Forest.
 
 ```{r}
-#| echo=FALSE
-# Cargamos los paquetes necesarios
-library( randomForest )
-
 # Ejecuto el modelo con el caracter de pertenencia al gurpo de las naranjas y
 # mandarinas como variable categórica. No cambio el conjunto de datos ya que
 # se usa el mismo que en la regresión logística
@@ -150,7 +151,8 @@ reg2_n <- randomForest( retXmax~., data = df_sub_1,  ntree = 500 )
 df_na$p_rf_narman <- reg2_n$predicted
 
 # porcentaje de observaciones que han superado el umbral
-round( nrow( df_na[ ( df_na$p_rf_narman >= 0.70 ), ] ) / nrow( df_na ) * 100)
+rf_narman_round <- round( nrow( df_na[ ( df_na$p_rf_narman >= 0.70 ), ] ) / 
+                   nrow( df_na ) * 100)
 
 # Estadisticos de acierto y representatividad en tanto de uno
 # porcentaje de acierto
@@ -165,7 +167,6 @@ rf_narman_rep <- nrow( df_na[ ( df_na$retXmax == 1 & df_na$p_rf_narman >= 0.7 ),
 Lo mismo para el grupo de los limones.
 
 ```{r}
-#| echo=FALSE
 # Ejecuto el modelo con el caracter de pertenencia al gurpo de los limones
 # como variable categórica. No cambio el conjunto de datos ya que
 # se usa el mismo que en la regresión logística
@@ -176,7 +177,8 @@ df_na$p_rf_lim <- reg2_l$predicted
 
 # Estadisticos de acierto y representatividad en tanto de uno
 # porcentaje de obsevaciones que han superado el umbral
-round( nrow( df_na[ ( df_na$p_rf_lim >= 0.70 ), ] ) / nrow( df_na ) )
+rf_lim_round <- round( nrow( df_na[ ( df_na$p_rf_lim >= 0.70 ), ] ) / 
+                nrow( df_na ) )
 
 # Porcentaje de acierto
 rf_lim_med <- nrow( df_na[ ( df_na$medXretXmax == 1 & df_na$p_rf_lim >= 0.70 ), ] ) / 
@@ -192,10 +194,6 @@ rf_lim_rep <- nrow( df_na[ ( df_na$medXretXmax == 1 & df_na$p_rf_lim >= 0.70 ), 
 Debido a que el algoritmo de XGBoost funciona distinto, la ejecución es distinta pese a que el procedimiento es igual.
 
 ```{r}
-#| echo=FALSE
-# Cargamos los paquetes necesarios
-library( xgboost )
-
 # Creamos una columna que contenga el grupo al que pertenece cada muestra, en 
 # este caso, limones, naranjas o mandarinas y otros (si no pertenece a ninguno)
 df_na$grupo <- ifelse( df_na$medXretXmax == 1, "limon", ifelse( df_na$retXmax == 1, "narman", "otro" ) )
@@ -269,9 +267,11 @@ df_na$p_xg_narman <- df_sub$p_xg_narman
 # Estadisticos de acierto y representatividad en tanto de uno
 # porcentaje de obsevaciones que han superado el umbral
 # Para las naranjas y mandarinas
-round( nrow( df_na[ ( df_na$p_xg_narman >= 0.70 ), ] ) / nrow( df_na ) )
+xg_narman_round <- round( nrow( df_na[ ( df_na$p_xg_narman >= 0.70 ), ] ) / 
+                   nrow( df_na ) * 100 )
 # Para los limones
-round( nrow( df_na[ ( df_na$p_xg_lim >= 0.70 ), ] ) / nrow( df_na ) )
+xg_lim_round <- round( nrow( df_na[ ( df_na$p_xg_lim >= 0.70 ), ] ) / 
+                nrow( df_na ) * 100 )
 
 # Porcentaje de acierto
 # Para las naranjas y mandarinas
@@ -297,12 +297,6 @@ xg_lim_rep <- nrow( df_na[ ( df_na$medXretXmax == 1 ) & ( df_na$p_xg_lim >= 0.70
 Unimos las inferencias hechas con los tres modelos intentando mejorar la capacidad predictiva.
 
 ```{r}
-#| echo=FALSE
-# Cargamos los paquetes necesarios
-library(opera)
-library(dplyr)
-library(Metrics)
-
 # Guardamos las predicciones de los 3 modelos 
 prllim <- df_na$p_rl_lim
 prflim <- df_na$p_rf_lim
@@ -336,9 +330,8 @@ df_na$pred_narman <- agg_narman$prediction
 En este modelo, se parte de la pertenencia o ausencia de los grupos creados por los cuatro ancestros estudiados, el procedimiento es similar.
 
 ```{r}
-#| echo=FALSE
 # Cargamos los datos
-df_anc <- read.csv('datos/df_na.csv')
+df_anc <- df_na
 
 # Establecimiento de los grupos
 df_sub_med <- df_anc %>% select( c( 'lp', 'wp', 'sp', 'll', 'wl', 
@@ -505,5 +498,7 @@ rep_medXretXmax <- nrow( df_anc[ ( df_anc$med == 1 & df_anc$ret == 1 &
                                      df_anc$ret == 1 & df_anc$max == 1 & 
                                      df_anc$mic != 1 ), ] )
 
+
+```
 
 ```
